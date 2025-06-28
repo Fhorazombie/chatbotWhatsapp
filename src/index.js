@@ -32,8 +32,6 @@ async function conectarWhatsapp(){
 
     // recibir Mensajes
     sock.ev.on("messages.upsert", async (event) => {
-
-        console.log(event.messages[0].message.conversation);
         for (const m of event.messages) {
             const nombre = m.pushName;
             const id = m.key.remoteJid;
@@ -45,6 +43,7 @@ async function conectarWhatsapp(){
             if(event.type != 'notify' || m.key.fromMe || id.includes('@g.us') || id.includes('@broadcast')){
                 return;
             }
+            console.log(m)
             console.log("Nombre: "+ nombre +" . dice: "+ mensaje);
 
             // Leer Mensaje
@@ -62,7 +61,7 @@ async function conectarWhatsapp(){
             }else if(['A','a'].includes(mensaje)){
                 await sock.sendMessage(id, {text: 'Hola este es un mensaje de texto'});
             }else if(['B','b'].includes(mensaje)){
-                await sock.sendMessage(id, {text: 'Hola @59173277937 este es un mensaje tipo mención', mentions: ['59173277937@s.whatsapp.net']});
+                await sock.sendMessage(id, {text: 'Hola @'+id+' este es un mensaje tipo mención', mentions: [id]});
             }else if(['C','c'].includes(mensaje)){
                 await sock.sendMessage(id, {
                     location: {
@@ -74,16 +73,16 @@ async function conectarWhatsapp(){
 
                 const vcard = 'BEGIN:VCARD\n' // metadata of the contact card
                     + 'VERSION:3.0\n' 
-                    + 'FN:Cristian\n' // full name
+                    + 'FN:Yoshua Palacios\n' // full name
                     + 'ORG:Blimbit;\n' // the organization of the contact
-                    + 'TEL;type=CELL;type=VOICE;waid=59173277937:+591 73277937\n' // WhatsApp ID + phone number
+                    + 'TEL;type=CELL;type=VOICE;waid=5212411641637:+521 2411641637\n' // WhatsApp ID + phone number
                     + 'END:VCARD'
 
                     await sock.sendMessage(
                         id,
                         { 
                             contacts: { 
-                                displayName: 'Cristian', 
+                                displayName: 'Yoshua Palacios', 
                                 contacts: [{ vcard }] 
                             }
                         }
