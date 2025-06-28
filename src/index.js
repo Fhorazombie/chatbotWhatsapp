@@ -1,4 +1,5 @@
 const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = require("baileys");
+const ffmpeg = require("fluent-ffmpeg");
 const QRCode = require("qrcode")
 
 async function conectarWhatsapp(){
@@ -121,6 +122,25 @@ async function conectarWhatsapp(){
                                             caption: 'Hola en este curso podrás aprender *FULLSTACK* con laravel y Angular. para más información escribenos...'
                                         })
                 
+            }else if(['I','i'].includes(mensaje)){
+                await sock.sendMessage(id, {document: {url: "https://blumbit.iivot.com/uploads/1746677445229-925358781-Temario%20Angular.pdf"}, fileName: 'Temario Angular'})
+                await sock.sendMessage(id, {document: {url: "https://blumbit.iivot.com/uploads/1746677445229-925358781-Temario%20Angular.pdf"}, fileName: 'Temario Angular', caption: 'Aquí encontrarás toda la información del curso Angular'})
+
+            }else if(['J','j'].includes(mensaje)){
+                await sock.sendMessage(id, {video: {url: "./Media/ma_gif.mp4"}})
+                await sock.sendMessage(id, {video: {url: "./Media/ma_gif.mp4"}, caption: 'Hola este es mi video'})
+                await sock.sendMessage(id, {video: {url: "./Media/ma_gif.mp4"}, ptv: true})
+                await sock.sendMessage(id, {video: {url: "./Media/ma_gif.mp4"}, gifPlayback: true})
+
+
+            }else if(['K','k'].includes(mensaje)){
+
+                const mp3Path = "./Media/sonata.mp3";
+                const opusPath = mp3Path.replace(/\.mp3$/, ".opus");
+                await convertirMp3AOpus(mp3Path, opusPath);
+
+                await sock.sendMessage(id, {audio: {url: "./Media/sonata.opus",}, ptt: true});
+
             }
 
             return;
@@ -131,3 +151,16 @@ async function conectarWhatsapp(){
 }
 
 conectarWhatsapp()
+
+// npm install fluent-ffmpeg
+function convertirMp3AOpus(inputPath, outputPath){
+    return new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+            .audioCodec('libopus')
+            .format("opus")
+            .audioBitrate(64)
+            .on('end', () => resolve(outputPath))
+            .on('error', reject)
+            .save(outputPath);
+    })
+}
