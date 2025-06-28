@@ -35,17 +35,26 @@ async function conectarWhatsapp(){
         for (const m of event.messages) {
             const nombre = m.pushName;
             const id = m.key.remoteJid;
-            const mensaje = m.message.conversation;
+            const mensaje = m.message.conversation != null ? m.message.conversation : m.message.extendedTextMessage.text
 
             // console.log(event.type);
             // console.log(m.key.fromMe);
             // console.log(id)
+            console.log("Objecto de mensaje:")
+            console.log(m)
+            console.log("Nombre: "+ nombre +" . dice: "+ mensaje);
             if(event.type != 'notify' || m.key.fromMe || id.includes('@g.us') || id.includes('@broadcast')){
                 return;
             }
-            console.log("Nombre: "+ nombre +" . dice: "+ mensaje);
-            await sock.sendMessage(id, {text: "Hola soy un BOT "});
 
+            sock.readMessages([m.key])
+            
+            if(['MENU','Menu', 'Hola', "hola"].includes(mensaje)){
+                await sock.sendMessage(id, {text: `*Hola* 👋 Bienvenid@ a *miBOT* 🌟. Selecciona una *Opción* que te interesa:\n- 👉 *A*: Mensaje Texto📱\n- 👉 *B*: Imagen\n> *Indícanos qué opción te interesa conocer!* `});
+
+            }else if(['A','a'].includes(mensaje)){
+                await sock.sendMessage(id, {text: 'Hola este es un mensaje de texto'});
+            }
 
         }
         
