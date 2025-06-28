@@ -32,10 +32,12 @@ async function conectarWhatsapp(){
 
     // recibir Mensajes
     sock.ev.on("messages.upsert", async (event) => {
+
+        // console.log(event.messages[0].message?.conversation);
         for (const m of event.messages) {
             const nombre = m.pushName;
             const id = m.key.remoteJid;
-            const mensaje = m.message.conversation != null ? m.message.conversation : m.message?.extendedTextMessage?.text
+            const mensaje = m.message?.conversation || m.message?.extendedTextMessage?.text;
 
             // console.log(event.type);
             // console.log(m.key.fromMe);
@@ -43,7 +45,6 @@ async function conectarWhatsapp(){
             if(event.type != 'notify' || m.key.fromMe || id.includes('@g.us') || id.includes('@broadcast')){
                 return;
             }
-            console.log(m)
             console.log("Nombre: "+ nombre +" . dice: "+ mensaje);
 
             // Leer Mensaje
@@ -56,7 +57,7 @@ async function conectarWhatsapp(){
             await delay(1000);
             
             if(['MENU','Menu', 'Menú', 'Hola', 'hola'].includes(mensaje)){
-                await sock.sendMessage(id, {text: `*Hola* 👋 Bienvenid@ a *miBOT* 🌟. Selecciona una *Opción* que te interesa:\n- 👉 *A*: Mensaje Texto📱\n- 👉 *B*: Mensaje Mención📱\n- 👉 *C*: Ubicación\n- 👉 *D*: Hablar con Asesor📱\n- 👉 *E*: Reacción\n> *Indícanos qué opción te interesa conocer!* `});
+                await sock.sendMessage(id, {text: `*Hola* 👋 Bienvenid@ a *miBOT* 🌟. Selecciona una *Opción* que te interesa:\n- 👉 *A*: Mensaje Texto📱\n- 👉 *B*: Mensaje Mención📱\n- 👉 *C*: Ubicación\n- 👉 *D*: Hablar con Asesor📱\n- 👉 *E*: Reacción\n- 👉 *H*: Links\n- 👉 *H*: Imágenes\n> *Indícanos qué opción te interesa conocer!* `});
 
             }else if(['A','a'].includes(mensaje)){
                 await sock.sendMessage(id, {text: 'Hola este es un mensaje de texto'});
@@ -109,6 +110,17 @@ async function conectarWhatsapp(){
                         }
                     }
                 )
+            }else if(['G','g'].includes(mensaje)){
+                await sock.sendMessage(id, {text: "Hola visita mi repositorio y sígueme: https://github.com/cchura94"})
+            }else if(['H','h'].includes(mensaje)){
+                await sock.sendMessage(id, {image: { url: "https://back.blumbit.net/api/public/Copia%20de%20Laravel%20y%20Angular%20(11).png"}})
+                await sock.sendMessage(id, {
+                                            image: { 
+                                                url: "https://back.blumbit.net/api/public/Copia%20de%20Laravel%20y%20Angular%20(11).png"
+                                            },
+                                            caption: 'Hola en este curso podrás aprender *FULLSTACK* con laravel y Angular. para más información escribenos...'
+                                        })
+                
             }
 
             return;
