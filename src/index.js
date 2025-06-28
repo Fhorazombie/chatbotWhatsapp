@@ -111,7 +111,7 @@ async function conectarWhatsapp(){
                     }
                 )
             }else if(['G','g'].includes(mensaje)){
-                await sock.sendMessage(id, {text: "Hola visita mi repositorio y sígueme: https://github.com/cchura94"})
+                await sock.sendMessage(id, {text: "Hola visita mi repositorio y sígueme: https://github.com/Fhorazombie"})
             }else if(['H','h'].includes(mensaje)){
                 await sock.sendMessage(id, {image: { url: "https://back.blumbit.net/api/public/Copia%20de%20Laravel%20y%20Angular%20(11).png"}})
                 await sock.sendMessage(id, {
