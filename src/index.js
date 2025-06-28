@@ -30,6 +30,27 @@ async function conectarWhatsapp(){
         }
     })
 
+    // recibir Mensajes
+    sock.ev.on("messages.upsert", async (event) => {
+        for (const m of event.messages) {
+            const nombre = m.pushName;
+            const id = m.key.remoteJid;
+            const mensaje = m.message.conversation;
+
+            // console.log(event.type);
+            // console.log(m.key.fromMe);
+            // console.log(id)
+            if(event.type != 'notify' || m.key.fromMe || id.includes('@g.us') || id.includes('@broadcast')){
+                return;
+            }
+            console.log("Nombre: "+ nombre +" . dice: "+ mensaje);
+            await sock.sendMessage(id, {text: "Hola soy un BOT "});
+
+
+        }
+        
+    });
+
 }
 
 conectarWhatsapp()
