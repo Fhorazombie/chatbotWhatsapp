@@ -45,10 +45,10 @@ async function connectToWhatsApp () {
             const nombre = m.pushName;
             const mensaje = m.message?.conversation || m.message?.extendedTextMessage?.text;
 
-            let contacto = await Contacto.findOne({where: {nro_whatsapp: id}})
+            let contacto = await Contacto.findOne({where: {numWhatsapp: id}})
             if(!contacto){
                 contacto = await Contacto.create({
-                    nro_whatsapp: id,
+                    numWhatsapp: id,
                     nombre: nombre
                 });
             }
