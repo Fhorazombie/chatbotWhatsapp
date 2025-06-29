@@ -1,5 +1,6 @@
 const { useMultiFileAuthState, default: makeWASocket, DisconnectReason } = require("baileys")
-const QRCode = require('qrcode')
+const QRCode = require('qrcode');
+const Contacto = require("./models/Contacto.js")
 
 async function connectToWhatsApp () {
 
@@ -43,7 +44,22 @@ async function connectToWhatsApp () {
             }
             const nombre = m.pushName;
             const mensaje = m.message?.conversation || m.message?.extendedTextMessage?.text;
-            await sock.sendMessage(id, {text: "Hola Mundo... desde bot"})
+
+            let contacto = await Contacto.findOne({where: {nro_whatsapp: id}})
+            if(!contacto){
+                contacto = await Contacto.create({
+                    nro_whatsapp: id,
+                    nombre: nombre
+                });
+            }
+            if(contacto.saldo > 0){
+
+                await sock.sendMessage(id, {text: "Hola "+contacto.nombre+" Tienes una deuda pendiente de: "+contacto.saldo});
+
+            }else{
+                await sock.sendMessage(id, {text: "Hola "+contacto.nombre+" No tienes saldos pendientes."});
+            }
+
         }
     });
 
@@ -51,3 +67,8 @@ async function connectToWhatsApp () {
 }
 
 connectToWhatsApp()
+
+
+
+// -----------------------------------------------
+
