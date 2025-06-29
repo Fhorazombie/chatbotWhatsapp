@@ -1,166 +1,328 @@
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason, delay } = require("baileys");
-const ffmpeg = require("fluent-ffmpeg");
-const QRCode = require("qrcode")
+const { useMultiFileAuthState, default: makeWASocket, DisconnectReason } = require("baileys")
+const QRCode = require('qrcode')
 
-async function conectarWhatsapp(){
+const userContext = {}
+
+async function connectToWhatsApp () {
 
     const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys')
-
-    // config
     const sock = makeWASocket({
+        // can provide additional config here
         auth: state
     });
 
     sock.ev.on("creds.update", saveCreds);
 
-    // conexion
-    sock.ev.on("connection.update", async(update) => {
-        const { connection, lastDisconnect, qr } = update;
-
+    sock.ev.on('connection.update', async (update) => {
+        const {connection, lastDisconnect, qr } = update
+        // on a qr event, the connection and lastDisconnect fields will be empty
+      
         if(connection === 'close'){
             const puedeConectarse = lastDisconnect.error?.output?.statusCode !== DisconnectReason.loggedOut;
             if(puedeConectarse){
-                conectarWhatsapp()
+                connectToWhatsApp()
             }
         }else if(connection === 'open'){
             console.log("CONEXION ABIERTA!!!");
         }
 
-        if(qr){
-            console.log(await QRCode.toString(qr, {type: 'terminal', small: true}));
+        // In prod, send this string to your frontend then generate the QR there
+        if (qr) {
+          // as an example, this prints the qr code to the terminal
+          console.log(await QRCode.toString(qr, {type:'terminal', small: true}))
         }
-    })
+      });
 
-    // recibir Mensajes
+
+       // recibir Mensajes
     sock.ev.on("messages.upsert", async (event) => {
+        console.log(userContext)
 
-        // console.log(event.messages[0].message?.conversation);
         for (const m of event.messages) {
-            const nombre = m.pushName;
             const id = m.key.remoteJid;
-            const mensaje = m.message?.conversation || m.message?.extendedTextMessage?.text;
 
-            // console.log(event.type);
-            // console.log(m.key.fromMe);
-            // console.log(id)
             if(event.type != 'notify' || m.key.fromMe || id.includes('@g.us') || id.includes('@broadcast')){
                 return;
             }
-            console.log("Nombre: "+ nombre +" . dice: "+ mensaje);
-
-            // Leer Mensaje
-            await sock.readMessages([m.key]);
-            // Escribiendo...
-            await delay(100);
-            await sock.sendPresenceUpdate("composing", id);
-            await delay(1000);
-            await sock.sendPresenceUpdate("recording", id);
-            await delay(1000);
+            const nombre = m.pushName;
+            let mensaje = m.message?.conversation || m.message?.extendedTextMessage?.text;
+            mensaje = mensaje+"".toUpperCase();
             
-            if(['MENU','Menu', 'Menú', 'Hola', 'hola'].includes(mensaje)){
-                await sock.sendMessage(id, {text: `*Hola* 👋 Bienvenid@ a *miBOT* 🌟. Selecciona una *Opción* que te interesa:\n- 👉 *A*: Mensaje Texto📱\n- 👉 *B*: Mensaje Mención📱\n- 👉 *C*: Ubicación\n- 👉 *D*: Hablar con Asesor📱\n- 👉 *E*: Reacción\n- 👉 *H*: Links\n- 👉 *H*: Imágenes\n> *Indícanos qué opción te interesa conocer!* `});
+            
+            if(!userContext[id]){
+                userContext[id] = { menuActual: "main" };
+                enviarMenu(sock, id, "main");
+                return;
+            }
+// 59176501385
+            
 
-            }else if(['A','a'].includes(mensaje)){
-                await sock.sendMessage(id, {text: 'Hola este es un mensaje de texto'});
-            }else if(['B','b'].includes(mensaje)){
-                await sock.sendMessage(id, {text: 'Hola @'+id+' este es un mensaje tipo mención', mentions: [id]});
-            }else if(['C','c'].includes(mensaje)){
-                await sock.sendMessage(id, {
-                    location: {
-                        degreesLatitude: 24.1212331,
-                        degreesLongitude: 55.112122,
-                        address: 'Av. 123. Zona: ABC'
-                    }});
-            }else if(['D','d'].includes(mensaje)){
+            const menuActual = userContext[id].menuActual;
+            const menu = menuData[menuActual];
 
-                const vcard = 'BEGIN:VCARD\n' // metadata of the contact card
-                    + 'VERSION:3.0\n' 
-                    + 'FN:Yoshua Palacios\n' // full name
-                    + 'ORG:Blimbit;\n' // the organization of the contact
-                    + 'TEL;type=CELL;type=VOICE;waid=5212411641637:+521 2411641637\n' // WhatsApp ID + phone number
-                    + 'END:VCARD'
+            const opcionSelecionada = menu.options[mensaje]
 
-                    await sock.sendMessage(
-                        id,
-                        { 
-                            contacts: { 
-                                displayName: 'Yoshua Palacios', 
-                                contacts: [{ vcard }] 
-                            }
-                        }
-                    )
-            }else if(['E','e'].includes(mensaje)){
-                await sock.sendMessage(
-                    id,
-                    {
-                        react: {
-                            text: '💖', // use an empty string to remove the reaction
-                            key: m.key
-                        }
+            if(opcionSelecionada){
+                if(opcionSelecionada.respuesta){
+                    const tipo = opcionSelecionada.respuesta.tipo;
+                    if(tipo == "text"){
+                        await sock.sendMessage(id, {text: opcionSelecionada.respuesta.msg})
                     }
-                )
-            }else if(['F','f'].includes(mensaje)){
-                await sock.sendMessage(
-                    id,
-                    {
-                        poll: {
-                            name: '¿Frontend o Backend?',
-                            values: ['Frontend', 'Backend', 'Fullstack'],
-                            selectableCount: 1,
-                            toAnnouncementGroup: false // or true
-                        }
+                    if(tipo == "image"){
+                        await sock.sendMessage(id, {image: opcionSelecionada.respuesta.msg})
                     }
-                )
-            }else if(['G','g'].includes(mensaje)){
-                await sock.sendMessage(id, {text: "Hola visita mi repositorio y sígueme: https://github.com/Fhorazombie"})
-            }else if(['H','h'].includes(mensaje)){
-                await sock.sendMessage(id, {image: { url: "https://back.blumbit.net/api/public/Copia%20de%20Laravel%20y%20Angular%20(11).png"}})
-                await sock.sendMessage(id, {
-                                            image: { 
-                                                url: "https://back.blumbit.net/api/public/Copia%20de%20Laravel%20y%20Angular%20(11).png"
-                                            },
-                                            caption: 'Hola en este curso podrás aprender *FULLSTACK* con laravel y Angular. para más información escribenos...'
-                                        })
+                    if(tipo == "document"){
+                        await sock.sendMessage(id, {document: opcionSelecionada.respuesta.msg})
+                    }
+                    if(tipo == "location"){
+                        await sock.sendMessage(id, {location: opcionSelecionada.respuesta.msg})
+                    }
+                    if(tipo == "contact"){
+                        await sock.sendMessage(id, {contacts: opcionSelecionada.respuesta.msg})
+                    }
+                }
+                if(opcionSelecionada.submenu){
+                    userContext[id].menuActual = opcionSelecionada.submenu;
+                    enviarMenu(sock, id, opcionSelecionada.submenu);
+                }
                 
-            }else if(['I','i'].includes(mensaje)){
-                await sock.sendMessage(id, {document: {url: "https://blumbit.iivot.com/uploads/1746677445229-925358781-Temario%20Angular.pdf"}, fileName: 'Temario Angular'})
-                await sock.sendMessage(id, {document: {url: "https://blumbit.iivot.com/uploads/1746677445229-925358781-Temario%20Angular.pdf"}, fileName: 'Temario Angular', caption: 'Aquí encontrarás toda la información del curso Angular'})
-
-            }else if(['J','j'].includes(mensaje)){
-                await sock.sendMessage(id, {video: {url: "./Media/ma_gif.mp4"}})
-                await sock.sendMessage(id, {video: {url: "./Media/ma_gif.mp4"}, caption: 'Hola este es mi video'})
-                await sock.sendMessage(id, {video: {url: "./Media/ma_gif.mp4"}, ptv: true})
-                await sock.sendMessage(id, {video: {url: "./Media/ma_gif.mp4"}, gifPlayback: true})
-
-
-            }else if(['K','k'].includes(mensaje)){
-
-                const mp3Path = "./Media/sonata.mp3";
-                const opusPath = mp3Path.replace(/\.mp3$/, ".opus");
-                await convertirMp3AOpus(mp3Path, opusPath);
-
-                await sock.sendMessage(id, {audio: {url: "./Media/sonata.opus",}, ptt: true});
+            }else{
+                // await sock.sendMessage(id, {text: "Por favor, elige una opción del menú"})
 
             }
 
-            return;
+            // await sock.sendMessage(id, {text: "Hola Mundo... desde bot"})
         }
-        
     });
 
+
 }
 
-conectarWhatsapp()
+connectToWhatsApp();
 
-// npm install fluent-ffmpeg
-function convertirMp3AOpus(inputPath, outputPath){
-    return new Promise((resolve, reject) => {
-        ffmpeg(inputPath)
-            .audioCodec('libopus')
-            .format("opus")
-            .audioBitrate(64)
-            .on('end', () => resolve(outputPath))
-            .on('error', reject)
-            .save(outputPath);
-    })
+async function enviarMenu(sock, id, menuKey){
+    const menu = menuData[menuKey];
+
+    const optionText = Object.entries(menu.options)
+                                .map(([key, option]) => `- 👉 *${key}*: ${option.text}`)
+                                .join("\n");
+    
+    const menuMensaje = `${menu.mensaje}\n\n${optionText}\n\n> *Escribe una opción!*`;
+
+    await sock.sendMessage(id, {text: menuMensaje});
 }
+
+// menu
+
+const menuData = {
+    main: {
+        mensaje: "*¡Bienvenid@ a [Nombre de la Clínica Dental]* 🦷. Selecciona una *opción* (ej. A, B, C)",
+        options: {
+            A: {
+                text: "Servicios Dentales 🦷",
+                submenu: "servicios"
+            },
+            B: {
+                text: "Ver Horarios y Ubicación 📍",
+                submenu: "ubicacion"
+            },
+            C: {
+                text: "Agenda una Cita 📅",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Para agendar tu cita, por favor elige una opción: 1) Agendar en línea 2) Llamar a la clínica."
+                }
+            },
+            D: {
+                text: "Preguntas Frecuentes ❓",
+                submenu: "faq"
+            },
+            E: {
+                text: "Contáctanos 📞",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Puedes llamarnos al número: +123 456 7890 o enviarnos un correo a: contacto@clinicadental.com"
+                }
+            },
+        }
+    },
+    servicios: {
+        mensaje: "Estos son los *servicios* dentales que ofrecemos:",
+        options: {
+            1: {
+                text: "Chequeo General 🦷",
+                respuesta: {
+                    tipo: "text",
+                    msg: "El chequeo general incluye una revisión completa de tu salud dental, limpieza y recomendaciones personalizadas."
+                }
+            },
+            2: {
+                text: "Blanqueamiento Dental ✨",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Nuestro tratamiento de blanqueamiento dental te ayudará a obtener una sonrisa más brillante y saludable."
+                }
+            },
+            3: {
+                text: "Ortodoncia (Brackets) 😁",
+                respuesta: {
+                    tipo: "text",
+                    msg: "La ortodoncia es el tratamiento ideal para alinear y corregir los dientes y la mordida. Contamos con opciones invisibles."
+                }
+            },
+            4: {
+                text: "Implantes Dentales 🦷",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Los implantes dentales son una excelente opción para reemplazar dientes perdidos de manera duradera y estética."
+                }
+            },
+            5: {
+                text: "Volver al menú principal",
+                submenu: "main"
+            },
+        }
+    },
+    faq: {
+        mensaje: "Estas son algunas de las preguntas frecuentes que recibimos:",
+        options: {
+            1: {
+                text: "¿Cada cuánto debo ir al dentista?",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Es recomendable acudir al dentista al menos una vez al año para un chequeo general y una limpieza dental."
+                }
+            },
+            2: {
+                text: "¿Los tratamientos son dolorosos?",
+                respuesta: {
+                    tipo: "text",
+                    msg: "La mayoría de nuestros tratamientos son rápidos y con mínima incomodidad. Nuestro equipo se asegura de que te sientas cómodo durante todo el proceso."
+                }
+            },
+            3: {
+                text: "¿Qué hacer si tengo dolor de muelas?",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Si experimentas dolor de muelas, es importante que agendes una cita lo antes posible para evitar complicaciones."
+                }
+            },
+            4: {
+                text: "¿Aceptan seguros dentales?",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Sí, trabajamos con varios seguros dentales. Por favor, consulta con nuestro equipo para más detalles."
+                }
+            },
+            5: {
+                text: "Volver al menú principal",
+                submenu: "main"
+            },
+        }
+    },
+    ubicacion: {
+        mensaje: "Estamos ubicados en: *Dirección de la Clínica Dental* 📍",
+        options: {
+            1: {
+                text: "Ver mapa",
+                respuesta: {
+                    tipo: "location",
+                    msg: {
+                        degreesLatitude: 19.432608,
+                        degreesLongitude: -99.133209,
+                        address: "Calle Ficticia 123, Ciudad, País"
+                    }
+                }
+            },
+            2: {
+                text: "Ver horarios de apertura",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Nuestro horario es de Lunes a Viernes de 8:00 AM a 6:00 PM y Sábados de 9:00 AM a 2:00 PM."
+                }
+            },
+            3: {
+                text: "Volver al menú principal",
+                submenu: "main"
+            },
+        }
+    }
+}
+
+
+/*
+const menuData = {
+    main: {
+        mensaje: "*Hola* 👋 Bienvenid@ a *miBot* 🌟. Selecciona una *opción* (ej. A,B)",
+        options: {
+            A: {
+                text: "Métodos de Pago",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Los métodos de pago son: ..."
+                }
+            },
+            B: {
+                text: "Ver catalogo",
+                respuesta: {
+                    tipo: "image",
+                    msg: {
+                        url: "https://back.blumbit.net/api/public/Copia%20de%20Laravel%20y%20Angular%20(11).png"
+                    }
+                }
+            },
+            C: {
+                text: "Nuestros Servicios📱",
+                submenu: "servicios"
+            },
+            D: {
+                text: "Nuestra Ubicación",
+                respuesta: {
+                    tipo: "location",
+                    msg: {
+                        degreesLatitude: 24.1212331,
+                        degreesLongitude: 55.112122,
+                        address: 'Av. 123. Zona: ABC'
+                    }
+                }
+            },
+        }
+    },
+    servicios: {
+        mensaje: "Nuestros *Servicios* que ofrecemos son:",
+        options: {
+            1: {
+                text: "Desarrollo de Software",
+                respuesta: {
+                    tipo: "text",
+                    msg: "Desarrollamos software a medida ..."
+                }
+            },
+            2: {
+                text: "Nuestros Clientes",
+                respuesta: {
+                    tipo: "document",
+                    msg: {
+                        url: "https://blumbit.iivot.com/uploads/1746677445229-925358781-Temario%20Angular.pdf"
+                    }
+                }
+            },
+            3: {
+                text: "Volver al menú",
+               submenu: "main"
+            },
+
+        }
+    }
+}
+*/
+/*
+*Hola* 👋 Bienvenid@ a *miBot* 🌟. Selecciona el *Curso* que te interesa y te enviaremos la información correspondiente:
+
+- 👉 *A*: Métodos de Pago
+- 👉 *B*: Ver catalogo
+- 👉 *C*: Nuestros Servicios📱
+- 👉 *D*: Nuestra Ubicación
+
+> *Indícanos qué opción te interesa conocer!* 
+*/
