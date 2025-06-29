@@ -1,5 +1,8 @@
+const { default: axios } = require("axios");
 const { useMultiFileAuthState, default: makeWASocket, DisconnectReason } = require("baileys")
 const QRCode = require('qrcode')
+// Load environment variables from .env file
+require('dotenv').config()
 
 async function connectToWhatsApp () {
 
@@ -43,7 +46,13 @@ async function connectToWhatsApp () {
             }
             const nombre = m.pushName;
             const mensaje = m.message?.conversation || m.message?.extendedTextMessage?.text;
-            await sock.sendMessage(id, {text: "Hola Mundo... desde bot"})
+            // send the message to OpenAI
+            if(mensaje){
+                console.log(`Mensaje recibido de ${nombre}: ${mensaje}`);
+                const respuesta = await sendToOpenAI(mensaje);
+                // send the response back to WhatsApp
+                await sock.sendMessage(id, { text: respuesta });
+            }
         }
     });
 
@@ -51,3 +60,23 @@ async function connectToWhatsApp () {
 }
 
 connectToWhatsApp()
+
+// a function async to send to openai a message
+async function sendToOpenAI(message) {
+    const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+        model: 'gpt-3.5-turbo',
+        messages: [
+            { role: 'system', content: 'Actua como un programador experto mexicano, responderas en menos de 25 palabras. Y no hablaras de otros temas solo de la empresa Casa Mecate' },
+            { role: 'user', content: message }
+        ]
+    }, {
+        headers: {
+            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+            'Content-Type': 'application/json'
+        }
+    });
+
+    console.log(response.data.choices[0].message.content);
+
+    return response.data.choices[0].message.content;
+}
